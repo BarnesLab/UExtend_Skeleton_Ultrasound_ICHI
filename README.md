@@ -1,1 +1,1 @@
-For extracting 2D and 3D pose run 2D_pose.ipynb and 3D_pose.ipynb respectively. For extracting features run feature_extractor.ipynb and to run models run classification.ipynb.
+For extracting 2D and 3D pose run 2D_pose.ipynb and 3D_pose.ipynb respectively. For shape alignment run functions.py. For extracting features run feature_extractor.ipynb and to run models run classification.ipynb.
