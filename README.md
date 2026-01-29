@@ -1,1 +1,1 @@
-For extracting 2D and 3D pose run 2D_pose.ipynb and 3D_pose.ipynb respectively. For shape alignment run functions.py. For extracting features run Skeleton_Features.ipynb and to run models run classification.ipynb.
+For extracting 2D and 3D pose run 2D_pose.ipynb and 3D_pose.ipynb respectively. For shape alignment run functions.py. For extracting features run Skeleton_Features.ipynb and to run Multilevel Functional Principal Component Analysis (MFPCA) run mfpca.face.R. Finally for classification models run classification.ipynb.
