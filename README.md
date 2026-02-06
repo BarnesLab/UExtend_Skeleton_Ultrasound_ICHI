@@ -120,36 +120,36 @@ MFPCA
 
 The pipeline is sequential and stateful. Run notebooks in this order.
 
-### Stage 1  Pose Construction
+### Stage 1 Pose Construction
 
 1. `2D_pose.ipynb`
 2. `multi_pose3D.ipynb`
 
-### Stage 2  Cleaning & Segmentation
+### Stage 2 Cleaning & Segmentation
 
 3. `segmentation.ipynb`
 4. `normalize time.ipynb`
 
-### Stage 3  Alignment & Geometry
+### Stage 3 Alignment & Geometry
 
 5. `alignment_functions.py` (used internally)
 6. `Skeleton_Features.ipynb`
 
-### Stage 4  Ultrasound Processing
+### Stage 4 Ultrasound Processing
 
 7. `US_data_Process.ipynb`
 
-### Stage 5  Feature Construction
+### Stage 5 Feature Construction
 
 8. `feature_extractor.ipynb`
 
-### Stage 6  Statistical Modeling
+### Stage 6 Statistical Modeling
 
 9. `f_mean_all_pca.ipynb`
 10. `fmean_left_right.ipynb`
 11. R scripts (`mfpca.face.R`, `face.Cov.mfpca.R`)
 
-### Stage 7  Machine Learning
+### Stage 7 Machine Learning
 
 12. `classification.ipynb`
 13. `shap_example.ipynb`
