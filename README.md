@@ -158,7 +158,7 @@ The pipeline is sequential and stateful. Run notebooks in this order.
 
 ## Conceptual Pipeline
 
-1. Convert pose detections ? continuous trajectories
+1. Convert pose detections to continuous trajectories
 2. Segment functional movement phases
 3. Time normalize curves
 4. Align curves in shape space
