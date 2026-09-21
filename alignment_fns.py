@@ -18,12 +18,12 @@ preshape.equip_with_quotient_structure()
 
 
 def procrustes_align_gpu(A_t, B_t, reflect=False):
-    # Convert (29, 3, 200) to (200, 29, 3)
+    # Convert (17, 3, 200) to (200, 17, 3)
     source_batch = A_t.permute(2, 0, 1)
     target_batch = B_t.permute(2, 0, 1)
 
     aligned_batch = Matrices.align_matrices(source_batch, target_batch)
-    return aligned_batch.permute(1, 2, 0)  # Back to (29, 3, 200)
+    return aligned_batch.permute(1, 2, 0)  # Back to (17, 3, 200)
 
 
 def align_trajectory_orientation_gpu(mu, traj, reflect=False):
@@ -35,7 +35,7 @@ def align_trajectory_orientation_gpu(mu, traj, reflect=False):
 def shape_log_map_gpu(p1, p2):
     # p1: landmarks x ambient
     # p2: landmarks x ambient
-    permuted_p1 = p1.permute(2, 0, 1)  # (29, 3, 200) to (200, 29, 3)
+    permuted_p1 = p1.permute(2, 0, 1)  # (17, 3, 200) to (200, 17, 3)
     permuted_p2 = p2.permute(2, 0, 1)
     log_map = preshape.quotient.metric.log(permuted_p2, permuted_p1)
     return log_map.permute(1, 2, 0)
@@ -43,19 +43,19 @@ def shape_log_map_gpu(p1, p2):
 
 
 def batched_frechet_log_map_gpu(p1, p2):
-    # p1: (29, 3, 200), a single set of landmarks across time
-    # p2: (130, 29, 3, 200), a batch of sets of landmarks across time
+    # p1: (17, 3, 200), a single set of landmarks across time
+    # p2: (130, 17, 3, 200), a batch of sets of landmarks across time
 
     # Add a new dimension to p1, then expand it to match p2's batch size
     expanded_p1 = p1.unsqueeze(0).expand(p2.shape[0], -1, -1, -1)
 
     # Permute to match the expected dimensions for processing
-    expanded_p1 = expanded_p1.permute(0, 3, 1, 2)  # (130, 200, 29, 3)
-    permuted_p2 = p2.permute(0, 3, 1, 2)  # (130, 200, 29, 3)
+    expanded_p1 = expanded_p1.permute(0, 3, 1, 2)  # (130, 200, 17, 3)
+    permuted_p2 = p2.permute(0, 3, 1, 2)  # (130, 200, 17, 3)
 
     # Calculate log maps in vectorized form across samples and time points
     log_maps = preshape.quotient.metric.log(permuted_p2, expanded_p1)
-    log_maps = log_maps.permute(2, 3, 1, 0)  # Back to (29, 3, 200, 130)
+    log_maps = log_maps.permute(2, 3, 1, 0)  # Back to (17, 3, 200, 130)
 
     return log_maps
 
@@ -69,7 +69,7 @@ def shape_exp_map_gpu(p, v):
 
 
 def parallel_transport_shape_gpu(v, p1, p2, n_steps=10):
-    permuted_vector = v.permute(2, 0, 1)  # (29, 3, 200) to (200, 29, 3)
+    permuted_vector = v.permute(2, 0, 1)  # (17, 3, 200) to (200, 17, 3)
     permuted_start_point = p1.permute(2, 0, 1)
     permuted_end_point = p2.permute(2, 0, 1)
     transported_vector = preshape.quotient.metric.parallel_transport(
