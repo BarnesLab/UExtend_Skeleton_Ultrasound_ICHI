@@ -17,7 +17,7 @@ preshape.equip_with_group_action("rotations")
 preshape.equip_with_quotient_structure()
 
 
-def OPA_gpu(A_t, B_t):
+def procrustes_align_gpu(A_t, B_t, reflect=False):
     # Convert (29, 3, 200) to (200, 29, 3)
     source_batch = A_t.permute(2, 0, 1)
     target_batch = B_t.permute(2, 0, 1)
@@ -26,13 +26,13 @@ def OPA_gpu(A_t, B_t):
     return aligned_batch.permute(1, 2, 0)  # Back to (29, 3, 200)
 
 
-def rotate_trajectory_align_gpu(mu, traj, reflect=False):
-    """Batch-aligns trajectories with mu using the modified OPA."""
-    aligned_trajectory = OPA_gpu(traj, mu, reflect=reflect)
+def align_trajectory_orientation_gpu(mu, traj, reflect=False):
+    """Batch-align a trajectory to the reference orientation using Procrustes alignment."""
+    aligned_trajectory = procrustes_align_gpu(traj, mu, reflect=reflect)
     return aligned_trajectory
 
 
-def log_gpu(p1, p2):
+def shape_log_map_gpu(p1, p2):
     # p1: landmarks x ambient
     # p2: landmarks x ambient
     permuted_p1 = p1.permute(2, 0, 1)  # (29, 3, 200) to (200, 29, 3)
@@ -42,7 +42,7 @@ def log_gpu(p1, p2):
     # return preshape.metric.log(p1, p2)
 
 
-def log_gpu_frechet(p1, p2):
+def batched_frechet_log_map_gpu(p1, p2):
     # p1: (29, 3, 200), a single set of landmarks across time
     # p2: (130, 29, 3, 200), a batch of sets of landmarks across time
 
@@ -60,7 +60,7 @@ def log_gpu_frechet(p1, p2):
     return log_maps
 
 
-def exp_gpu(p, v):
+def shape_exp_map_gpu(p, v):
     # p: landmarks x ambient
     permuted_point = p.permute(2, 0, 1)
     permuted_tangent_vector = v.permute(2, 0, 1)
@@ -68,7 +68,7 @@ def exp_gpu(p, v):
     return exp_map.permute(1, 2, 0)
 
 
-def parallel_gpu(v, p1, p2, n_steps=10):
+def parallel_transport_shape_gpu(v, p1, p2, n_steps=10):
     permuted_vector = v.permute(2, 0, 1)  # (29, 3, 200) to (200, 29, 3)
     permuted_start_point = p1.permute(2, 0, 1)
     permuted_end_point = p2.permute(2, 0, 1)
@@ -81,7 +81,7 @@ def parallel_gpu(v, p1, p2, n_steps=10):
     return transported_vector.permute(1, 2, 0)
 
 
-def preprocess(x):
+def normalize_shape_configuration(x):
     """Removes translations and scaling from a k (landmarks) x m (ambient dimension, eg. 2 for 2d shapes)"""
     centroid = x.mean(axis=0)
     for landmark_idx in range(x.shape[0]):
@@ -90,25 +90,25 @@ def preprocess(x):
     return x
 
 
-def preprocess_temporal(data):
+def normalize_shape_trajectory(data):
     """Mean centers data and removes scaling for kendall shape space"""
     for time_idx in range(data.shape[2]):
-        data[:, :, time_idx] = preprocess(data[:, :, time_idx])
+        data[:, :, time_idx] = normalize_shape_configuration(data[:, :, time_idx])
 
     return data
 
 
-def cov_der_gpu(beta_t, delta_t, c):
+def covariant_trajectory_derivative_gpu(beta_t, delta_t, c):
     """Given a function, calculate a derivative in the tangent space of beta(t)"""
     trajectory_derivative = torch.zeros_like(beta_t)
 
     # Compute the log differences for all time points except the last one
     trajectory_derivative[:, :, :-1] = (
-        log_gpu(beta_t[:, :, :-1], beta_t[:, :, 1:]) / delta_t
+        shape_log_map_gpu(beta_t[:, :, :-1], beta_t[:, :, 1:]) / delta_t
     )
 
     # Handle the last point separately
-    transported_last_derivative = parallel_gpu(
+    transported_last_derivative = parallel_transport_shape_gpu(
         trajectory_derivative[:, :, -2].unsqueeze(2),
         beta_t[:, :, -2].unsqueeze(2),
         beta_t[:, :, -1].unsqueeze(2),
@@ -118,15 +118,15 @@ def cov_der_gpu(beta_t, delta_t, c):
     return trajectory_derivative
 
 
-def parallel_vf_gpu(v, beta, c):
+def transport_trajectory_vector_field_gpu(v, beta, c):
     """Transports the entire vector field v to the tangent spaces at beta to the tangent space of reference point c"""
     reference_point = c.unsqueeze(2)
 
-    transported_vector_field = parallel_gpu(v, beta, reference_point)
+    transported_vector_field = parallel_transport_shape_gpu(v, beta, reference_point)
     return transported_vector_field
 
 
-def srvf_gpu(beta_dot_t, delta_t):
+def compute_srvf_representation_gpu(beta_dot_t, delta_t):
     # Calculate the norm of each slice along the first two axes
     derivative_norms = torch.linalg.norm(beta_dot_t, dim=(0, 1), keepdim=True)
 
@@ -137,15 +137,15 @@ def srvf_gpu(beta_dot_t, delta_t):
     return normalized_srvf
 
 
-def tsrvf(beta_t, delta_t, c):
-    trajectory_derivative = cov_der_gpu(beta_t, delta_t, c)
-    transported_derivative = parallel_vf_gpu(trajectory_derivative, beta_t, c)
-    trajectory_tsrvf = srvf_gpu(transported_derivative, delta_t)
+def compute_transport_srvf_gpu(beta_t, delta_t, c):
+    trajectory_derivative = covariant_trajectory_derivative_gpu(beta_t, delta_t, c)
+    transported_derivative = transport_trajectory_vector_field_gpu(trajectory_derivative, beta_t, c)
+    trajectory_tsrvf = compute_srvf_representation_gpu(transported_derivative, delta_t)
 
     return trajectory_tsrvf
 
 
-def compose_gpu(beta, t, gamma):
+def warp_shape_trajectory_gpu(beta, t, gamma):
     # Convert numpy arrays to torch tensors and move to GPU
     gamma_tensor = torch.from_numpy(gamma).to(device)
 
@@ -166,19 +166,19 @@ def compose_gpu(beta, t, gamma):
     left_points = beta[:, :, interval_indices - 1]
     right_points = beta[:, :, interval_indices]
 
-    segment_log_vectors = log_gpu(left_points, right_points)
+    segment_log_vectors = shape_log_map_gpu(left_points, right_points)
     scaled_log_vectors = segment_log_vectors * interpolation_weights.unsqueeze(0).unsqueeze(0)
 
-    reparameterized_trajectory = exp_gpu(left_points, scaled_log_vectors)
+    reparameterized_trajectory = shape_exp_map_gpu(left_points, scaled_log_vectors)
     return reparameterized_trajectory
 
 
-def temporal_align(mu, beta, delta_t):
+def estimate_temporal_reparameterization(mu, beta, delta_t):
     reference_point = mu[:, :, 0]
 
     """mu, beta are two rotationally aligned trajectories"""
-    reference_tsrvf = tsrvf(mu, delta_t, reference_point)
-    trajectory_tsrvf = tsrvf(beta, delta_t, reference_point)
+    reference_tsrvf = compute_transport_srvf_gpu(mu, delta_t, reference_point)
+    trajectory_tsrvf = compute_transport_srvf_gpu(beta, delta_t, reference_point)
 
     reference_tsrvf_flat = reference_tsrvf.reshape(-1, reference_tsrvf.shape[2])
     trajectory_tsrvf_flat = trajectory_tsrvf.reshape(-1, reference_tsrvf.shape[2])
@@ -195,7 +195,7 @@ def temporal_align(mu, beta, delta_t):
 from tqdm.notebook import tqdm
 
 
-def temporal_rotation_align(mu, beta, t, iterations=10, tol=10 ** (-5), reflect=False):
+def align_shape_trajectory_spatiotemporal(mu, beta, t, iterations=10, tol=10 ** (-5), reflect=False):
     previous_error = -10000
     time_step = t[1] - t[0]
     error_history = []
@@ -207,14 +207,14 @@ def temporal_rotation_align(mu, beta, t, iterations=10, tol=10 ** (-5), reflect=
         alignment_error = alignment_error.item()
         error_history.append(alignment_error)
 
-        aligned_trajectory = rotate_trajectory_align_gpu(
+        aligned_trajectory = align_trajectory_orientation_gpu(
             mu,
             aligned_trajectory,
             reflect=reflect,
         )
 
-        inverse_warp = temporal_align(mu, aligned_trajectory, time_step)
-        aligned_trajectory = compose_gpu(aligned_trajectory, t, inverse_warp)
+        inverse_warp = estimate_temporal_reparameterization(mu, aligned_trajectory, time_step)
+        aligned_trajectory = warp_shape_trajectory_gpu(aligned_trajectory, t, inverse_warp)
 
         if abs(alignment_error - previous_error) < tol:
             break
@@ -227,11 +227,11 @@ def temporal_rotation_align(mu, beta, t, iterations=10, tol=10 ** (-5), reflect=
 from joblib import Parallel, delayed
 
 
-def parallel_align(mu, betas, t):
+def align_trajectory_collection_parallel(mu, betas, t):
     num_trajectories = len(betas)
 
     def align(trajectory_idx):
-        return temporal_rotation_align(mu, betas[trajectory_idx], t)
+        return align_shape_trajectory_spatiotemporal(mu, betas[trajectory_idx], t)
 
     alignment_results = Parallel(n_jobs=-1)(
         delayed(align)(trajectory_idx)
@@ -249,15 +249,15 @@ def parallel_align(mu, betas, t):
     )
 
 
-def process_kinematic(data, gamma_t):
+def resample_kinematic_trajectories(data, gamma_t):
     participant_ids = data.keys()
     resampled_trajectories = []
 
     for participant_idx, participant_id in enumerate(participant_ids):
-        trajectory = preprocess_temporal(data[participant_id])
+        trajectory = normalize_shape_trajectory(data[participant_id])
         time_grid = torch.linspace(0, 1, steps=trajectory.shape[2])
 
-        resampled_trajectory = compose_gpu(
+        resampled_trajectory = warp_shape_trajectory_gpu(
             torch.from_numpy(trajectory).to(device),
             time_grid,
             gamma_t,
@@ -267,7 +267,7 @@ def process_kinematic(data, gamma_t):
     return resampled_trajectories
 
 
-def frechet(betas, t, mu_init, iterations=50, plot=True, tol=10 ** (-5)):
+def estimate_frechet_mean_trajectory(betas, t, mu_init, iterations=50, plot=True, tol=10 ** (-5)):
     original_betas = np.copy(betas)
 
     step_size = 0.1
@@ -278,14 +278,14 @@ def frechet(betas, t, mu_init, iterations=50, plot=True, tol=10 ** (-5)):
 
     # Quotient translation and scaling
     # for trajectory_idx in range(num_trajectories):
-    #     betas[trajectory_idx] = preprocess_temporal(betas[trajectory_idx])
+    #     betas[trajectory_idx] = normalize_shape_trajectory(betas[trajectory_idx])
 
     frechet_mean = torch.from_numpy(mu_init).to(device)
     trajectory_tensors = [torch.from_numpy(beta).to(device) for beta in betas]
     time_grid = torch.from_numpy(t).to(device)
 
     for iteration_idx in tqdm(range(iterations)):
-        aligned_trajectories, warping_functions, alignment_histories = parallel_align(
+        aligned_trajectories, warping_functions, alignment_histories = align_trajectory_collection_parallel(
             frechet_mean,
             trajectory_tensors,
             time_grid,
@@ -294,7 +294,7 @@ def frechet(betas, t, mu_init, iterations=50, plot=True, tol=10 ** (-5)):
         aligned_trajectories_tensor = torch.stack(aligned_trajectories, dim=0)
 
         # Compute all tangent vectors at once
-        tangent_vectors = log_gpu_frechet(
+        tangent_vectors = batched_frechet_log_map_gpu(
             frechet_mean,
             aligned_trajectories_tensor,
         )
@@ -303,7 +303,7 @@ def frechet(betas, t, mu_init, iterations=50, plot=True, tol=10 ** (-5)):
         mean_tangent_vector = torch.mean(tangent_vectors, dim=3)
 
         # Update the Frechet mean
-        frechet_mean = exp_gpu(
+        frechet_mean = shape_exp_map_gpu(
             frechet_mean,
             step_size * mean_tangent_vector,
         )
