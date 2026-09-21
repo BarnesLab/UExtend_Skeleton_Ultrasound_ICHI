@@ -129,7 +129,7 @@ The pipeline is sequential and stateful. Run notebooks in this order.
 
 ### Stage 3 Alignment & Geometry
 
-5. `alignment_functions.py` (used internally)
+5. `a_fns.py` (used internally)
 6. `Skeleton_Features.ipynb`
 
 ### Stage 4 Ultrasound Processing
@@ -140,16 +140,14 @@ The pipeline is sequential and stateful. Run notebooks in this order.
 
 8. `feature_extractor.ipynb`
 
-### Stage 6 Statistical Modeling
+### Stage 6 MFPCA
 
-9. `f_mean_all_pca.ipynb`
-10. `fmean_left_right.ipynb`
-11. R scripts (`mfpca.face.R`, `face.Cov.mfpca.R`)
+9. R scripts (`mfpca.face.R`, `face.Cov.mfpca.R`)
 
 ### Stage 7 Machine Learning
 
-12. `classification.ipynb`
-13. `shap_example.ipynb`
+10. `classification.ipynb`
+11. `shap_example.ipynb`
 
 ---
 
@@ -163,12 +161,6 @@ The pipeline is sequential and stateful. Run notebooks in this order.
 6. Combine ultrasound biomarkers
 7. Train classification models
 8. Interpret using SHAP
-
----
-
-## GPU Acceleration
-
-If CUDA is available, `functionsgpu.py` and `functionsjointgpu.py` provide faster curve operations for large cohorts. CPU versions remain available for reproducibility.
 
 ---
 
