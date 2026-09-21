@@ -25,7 +25,7 @@ The repository is notebook-centric and is intended primarily for research reprod
 | `multi_pose3D.ipynb`                         | 3D skeleton construction and cleaning    |
 | `segmentation.ipynb`                         | Motion segmentation into task phases     |
 | `normalize time.ipynb`                       | Temporal alignment / resampling          |
-| `functionsgpu.py`                            | GPU-accelerated curve alignment operations|
+| `alignment_fns.py`                            | GPU-accelerated curve alignment operations|
 | `Skeleton_Features.ipynb`                    | Skeleton feature extraction              |
 | `US_data_Process.ipynb`                      | Ultrasound preprocessing                 |
 | `feature_extractor.ipynb`                    | Multimodal feature assembly              |
