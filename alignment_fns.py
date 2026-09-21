@@ -11,41 +11,19 @@ import fdasrsf
 import matplotlib.pyplot as plt
 from geomstats.geometry.matrices import Matrices
 
-preshape = PreShapeSpace(29, 3)
+preshape = PreShapeSpace(17, 3)
 # preshape = PreShapeSpace(3, 2)
 preshape.equip_with_group_action("rotations")
 preshape.equip_with_quotient_structure()
 
 
-def OPA_gpu(A_t, B_t, reflect=False):
-    """Aligns A to B."""
-    if reflect:
-        # Correctly transpose A_t and B_t to enable proper matrix multiplication
-        source_batch = A_t.permute(2, 1, 0)  # (200, 3, 29)
-        target_batch = B_t.permute(2, 1, 0)  # (200, 3, 29)
+def OPA_gpu(A_t, B_t):
+    # Convert (29, 3, 200) to (200, 29, 3)
+    source_batch = A_t.permute(2, 0, 1)
+    target_batch = B_t.permute(2, 0, 1)
 
-        # Transpose source to get (200, 29, 3)
-        source_transposed = source_batch.permute(0, 2, 1)  # (200, 29, 3)
-
-        # Perform batch matrix multiplication across the sample dimension
-        cross_covariance = target_batch @ source_transposed
-        left_singular_vectors, singular_values, right_singular_vectors_t = torch.linalg.svd(
-            cross_covariance,
-            full_matrices=False,
-        )
-        rotation_matrices = left_singular_vectors @ right_singular_vectors_t
-
-        # Apply the rotation matrices to the source batch
-        aligned_batch = rotation_matrices @ source_batch
-
-        return aligned_batch.permute(2, 1, 0)  # Back to (29, 3, 200)
-    else:
-        # Convert (29, 3, 200) to (200, 29, 3)
-        source_batch = A_t.permute(2, 0, 1)
-        target_batch = B_t.permute(2, 0, 1)
-
-        aligned_batch = Matrices.align_matrices(source_batch, target_batch)
-        return aligned_batch.permute(1, 2, 0)  # Back to (29, 3, 200)
+    aligned_batch = Matrices.align_matrices(source_batch, target_batch)
+    return aligned_batch.permute(1, 2, 0)  # Back to (29, 3, 200)
 
 
 def rotate_trajectory_align_gpu(mu, traj, reflect=False):
